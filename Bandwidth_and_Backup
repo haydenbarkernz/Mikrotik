@@ -68,6 +68,6 @@
 /file set $filename2 contents=([get $filename2 contents] ."    ". $avrTX);
 
 :local files {$backupconf;$backuplog;$filename2;$backupexport}
-/tool e-mail send to="hbarker@ideanetworks.com" subject=("$[/system identity get name] :: " . $avrRX . "::" .  $avrTX . ", Backup Configuration & Log") file=$files
+/tool e-mail send to="user@example.com" subject=("$[/system identity get name] :: " . $avrRX . "::" .  $avrTX . ", Backup Configuration & Log") file=$files
 
 :log info "backup LOG finished"
