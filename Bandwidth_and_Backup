@@ -1,0 +1,73 @@
+:local backupconf "$[/system identity get name]-CONF.backup"
+:local backuplog "$[/system identity get name]-LOG.txt"
+:local backupexport "$[/system identity get name]-export.txt"
+
+:log info "Backup Configurations $backupconf"
+/system backup save name=$backupconf
+:log info "Backup pausing for 10s"
+:delay 10s
+
+:log info "Backup log $backuplog"
+/log print file=$backuplog
+:log info "Backup log pausing for 10s"
+:delay 10s
+:log info "Backup being emailed"
+
+:log info "Backup export $backupexport"
+/export compact file=$backupexport
+:log info "Backup export pausing for 10s"
+:delay 10s
+:log info "Backup export being emailed"
+
+:log info "------------ BW-TEST Starts--------------";
+:local luser "";
+:local lpass "";
+:local Addr  "10.0.0.1";
+
+:local avrRX 0;
+:local avrTX 0;
+
+# DOWNLOAD TEST
+:log info "----> Measuring RX ........";
+:do {/tool
+   bandwidth-test duration=10s user=$luser password=$lpass protocol=tcp address=$Addr direction=receive do={
+     :set $avrRX ("RX : " . ($"rx-total-average" / 1048576) . "." . ($"rx-total-average" % (1048576) / 1024) . " Mbps" );
+   }
+} on-error={:log error message="RX script failed"}
+
+:delay 2s;
+
+# UPLOAD TEST
+:log info "----> Measuring TX ........";
+:do {/tool
+  bandwidth-test duration=10s user=$luser password=$lpass protocol=tcp address=$Addr direction=transmit do={
+     :set $avrTX ("TX : " . ($"tx-total-average" / 1048576) . "." . ($"tx-total-average" % (1048576) / 1024) . " Mbps" );
+  }
+} on-error={:log error message="TX script failed"}
+
+:log info message=$avrRX;
+:log info message=$avrTX;
+:log info "-------- End of  BW-TEST------------";
+
+# LOG BTEST TO FILE
+:local filename2 "$[/system identity get name]-btest-log.txt"
+:local ds [/system clock get date];
+:local months ("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec");
+:local month [ :pick $ds 0 3 ];
+:local mm ([ :find $months $month -1 ] + 1);
+:if ($mm < 10) do={ :set mm ("0" . $mm); };
+:set ds ([:pick $ds 7 11] . $mm . [:pick $ds 4 6]);
+
+:if  ( [:len [/file find name=$filename2]] = 0) do={
+:log info "Log file does not exist. Creating a new one.....";
+/file print file=$filename2 where name="";
+}
+
+:log info "Adding result to the end of the lof file......";
+/file set $filename2 contents=([get $filename2 contents]  ."\n".$ds."-->" . $avrRX);
+/file set $filename2 contents=([get $filename2 contents] ."    ". $avrTX);
+
+:local files {$backupconf;$backuplog;$filename2;$backupexport}
+/tool e-mail send to="hbarker@ideanetworks.com" subject=("$[/system identity get name] :: " . $avrRX . "::" .  $avrTX . ", Backup Configuration & Log") file=$files
+
+:log info "backup LOG finished"
